@@ -4,10 +4,9 @@
 # SPDX-License-Identifier: MIT
 
 """
-This script adds LFX maintenace notices to all matching Cloudflare CDN services
-in the current AWS environment.
-
-Usage: AWS_PROFILE=prdct-dev ./cdn_maintenance_toggle.py -v --disable-sites "*.platform.linuxfoundation.org" "*.lfx.dev"
+This script disables/enables CDN services operating on AWS Cloudfront by
+setting them into maintenance mode, implemented as a Cloudfront edge function
+returning an HTML maintenance page.
 """
 
 import argparse
