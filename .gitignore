@@ -1,0 +1,8 @@
+# Copyright The Linux Foundation and each contributor to LFX.
+# SPDX-License-Identifier: MIT
+
+# Normally, committing lockfiles is a best practice. But 1) this is a local
+# shell utility, run sporadically and 2) committing a lockfile means keeping it
+# up to date every time there is a security issue. In this case, we're going to
+# assume "follow latest" for each use/installation.
+Pipfile.lock

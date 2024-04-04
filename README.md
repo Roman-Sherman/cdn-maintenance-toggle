@@ -16,9 +16,8 @@ For more details, run the script with the `--help` option.
 
 ## Setup & Usage for Linux Foundation / LFX sites
 
-Recommend installation is via a pipenv-managed virtualenv (with consistent
-package versions tracked in the lock file), and pyenv to install the supported
-Python release if your system doesn't have Python 3.11.
+Recommend installation is via a pipenv-managed virtualenv, and pyenv to install
+the supported Python release if your system doesn't have Python 3.11.
 
 Be sure to set `AWS_PROFILE` with MFA and/or SSO authentication helpers before
 running the script.
@@ -37,7 +36,7 @@ the current user. This tool has been developed against Python 3.11 and may not
 work on other versions.
 
 ```bash
-pip3.11 install --user boto3
+pip3.11 install --user boto3 trieregex
 # Optional: to set AWS_PROFILE or other parameters via .env:
 # pip3.11 install --user python-dotenv
 ./cdn_maintenance_toggle.py --template lfx-maintenance.html -v --disable-sites "*.platform.linuxfoundation.org" "*.lfx.dev"
