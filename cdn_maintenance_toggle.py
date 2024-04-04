@@ -10,16 +10,15 @@ returning an HTML maintenance page.
 """
 
 import argparse
-from base64 import b64encode
-from hashlib import sha256
-from fnmatch import fnmatch
-import logging
 import ipaddress
+import logging
 import os
+from base64 import b64encode
+from fnmatch import fnmatch
+from hashlib import sha256
 
 import boto3
 from botocore.exceptions import ClientError
-
 from trieregex import TrieRegEx as TRE
 
 # Optional support for .env file.
@@ -30,7 +29,7 @@ except ImportError:
 else:
     load_dotenv()
 
-CLIENT = boto3.client('cloudfront')
+CLIENT = boto3.client("cloudfront")
 
 FUNCTION_TEMPLATE = """function handler(event) {
   var headers;
@@ -75,25 +74,60 @@ FUNCTION_TEMPLATE = """function handler(event) {
   return response;
 }"""
 
+
 def main():
     """main is the entry point for script invocations."""
 
     # Parse arguments from command line.
-    parser = argparse.ArgumentParser(description='Set or clear maintenance notices on CloudFlare CDNs for the current AWS_PROFILE.')
-    parser.add_argument('--dry-run', action='store_true', help='show actions to be taken without saving them')
+    parser = argparse.ArgumentParser(
+        description="Set or clear maintenance notices on CloudFlare CDNs for the current AWS_PROFILE."
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="show actions to be taken without saving them",
+    )
     enable_disable = parser.add_mutually_exclusive_group(required=True)
-    enable_disable.add_argument('--enable-sites', nargs='+', metavar='PATTERN', help='enable matching domains (clear maintenance page)')
-    enable_disable.add_argument('--disable-sites', nargs='+', metavar='PATTERN', help='disable matching domains (set maintenance page)')
-    enable_disable.add_argument('--cleanup', action='store_true', help='delete unused maintenance page functions')
-    parser.add_argument('--template', type=argparse.FileType('r'), metavar='FILE', help='template file for HTML response')
+    enable_disable.add_argument(
+        "--enable-sites",
+        nargs="+",
+        metavar="PATTERN",
+        help="enable matching domains (clear maintenance page)",
+    )
+    enable_disable.add_argument(
+        "--disable-sites",
+        nargs="+",
+        metavar="PATTERN",
+        help="disable matching domains (set maintenance page)",
+    )
+    enable_disable.add_argument(
+        "--cleanup",
+        action="store_true",
+        help="delete unused maintenance page functions",
+    )
+    parser.add_argument(
+        "--template",
+        type=argparse.FileType("r"),
+        metavar="FILE",
+        help="template file for HTML response",
+    )
     ip_source = parser.add_mutually_exclusive_group()
-    ip_source.add_argument('--allow-ip', nargs='*', metavar='IP', help='IPs to bypass maintenance page')
-    ip_source.add_argument('--allow-ip-file', type=argparse.FileType('r'), metavar='FILE', help='read bypass IPs from file, one per line')
-    parser.add_argument('-v', '--verbose', action='store_true', help='log actions taken')
+    ip_source.add_argument(
+        "--allow-ip", nargs="*", metavar="IP", help="IPs to bypass maintenance page"
+    )
+    ip_source.add_argument(
+        "--allow-ip-file",
+        type=argparse.FileType("r"),
+        metavar="FILE",
+        help="read bypass IPs from file, one per line",
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="log actions taken"
+    )
 
     args = parser.parse_args()
 
-    if os.getenv('DEBUG'):
+    if os.getenv("DEBUG"):
         # Enable debug logging via undocumented environmental variable.
         logging.basicConfig(level=10)
     elif args.verbose:
@@ -120,7 +154,10 @@ def main():
         if args.template is not None:
             html = args.template.read()
 
-        disable_sites(args.disable_sites, html=html, allowed_ips=allowed_ips, dry_run=args.dry_run)
+        disable_sites(
+            args.disable_sites, html=html, allowed_ips=allowed_ips, dry_run=args.dry_run
+        )
+
 
 def enable_sites(patterns, dry_run=False):
     """Enable sites matching patterns (clear maintenance page)."""
@@ -133,12 +170,13 @@ def enable_sites(patterns, dry_run=False):
     for distribution in targets:
         remove_maintenance_function(distribution, dry_run=dry_run)
 
+
 def disable_sites(patterns, html=None, allowed_ips=tuple(), dry_run=False):
     """Disable sites matching patterns (set maintenance page)."""
 
     if html is None:
         # Fallback/default maintenance page HTML.
-        html = '<!DOCTYPE html><html><body><p>This site is down for scheduled maintenance.</p></body></html>'
+        html = "<!DOCTYPE html><html><body><p>This site is down for scheduled maintenance.</p></body></html>"
 
     # Find Cloudfront distributions matching the supplied domain patterns.
     targets = get_matching_distributions(patterns)
@@ -150,10 +188,10 @@ def disable_sites(patterns, html=None, allowed_ips=tuple(), dry_run=False):
         # Bypass function creation if there are no matching targets.
         return
 
-    html_bytes = html.encode('utf8')
+    html_bytes = html.encode("utf8")
 
     # Validate passed IPs and build a trie regex pattern out of them.
-    tre = TRE('127.0.0.1')
+    tre = TRE("127.0.0.1")
     for ip_text in allowed_ips:
         try:
             # Read IPv4 & IPv6 addresses.
@@ -178,13 +216,14 @@ def disable_sites(patterns, html=None, allowed_ips=tuple(), dry_run=False):
     ip_pattern = tre.regex()
 
     # Interpolate allowed IPs and base64-encoded HTML into function template.
-    function = FUNCTION_TEMPLATE % (ip_pattern, b64encode(html_bytes).decode('utf8'))
+    function = FUNCTION_TEMPLATE % (ip_pattern, b64encode(html_bytes).decode("utf8"))
 
     # Create the function and get the hashed function name.
     function_name = create_function(function, dry_run)
 
     for distribution in targets:
         set_maintenance_function(distribution, function_name, dry_run=dry_run)
+
 
 def cleanup(dry_run=False):
     """Delete unused maintenance pages."""
@@ -196,21 +235,28 @@ def cleanup(dry_run=False):
 
     # Loop through a set of unique names, rather than all items, to deduplicate
     # DEV/LIVE stage.
-    for function_name in {item['Name'] for item in resp['FunctionList']['Items'] if item['Name'][:12] == "maintenance-"}:
+    for function_name in {
+        item["Name"]
+        for item in resp["FunctionList"]["Items"]
+        if item["Name"][:12] == "maintenance-"
+    }:
         logging.info("deleting function %s", function_name)
 
         if dry_run is True:
             continue
 
-        etag = CLIENT.describe_function(Name=function_name)['ETag']
+        etag = CLIENT.describe_function(Name=function_name)["ETag"]
 
         try:
             CLIENT.delete_function(Name=function_name, IfMatch=etag)
         except ClientError as error:
-            if error.response['Error']['Code'] == 'FunctionInUse':
-                logging.warning("skipping deletion of active function: %s", function_name)
+            if error.response["Error"]["Code"] == "FunctionInUse":
+                logging.warning(
+                    "skipping deletion of active function: %s", function_name
+                )
             else:
                 raise error
+
 
 def create_function(function, dry_run=False):
     """Idempotently create-if-not-exist the provided CloudFront function and return the function name."""
@@ -219,17 +265,20 @@ def create_function(function, dry_run=False):
         raise ValueError("function is too big, try reducing allowed IPs")
 
     # Hash the function to calculate a unique function name.
-    function_hash = sha256(function.encode('utf8')).hexdigest()
+    function_hash = sha256(function.encode("utf8")).hexdigest()
     function_name = f"maintenance-{function_hash[:12]}"
 
     resp = CLIENT.list_functions()
 
     found_name = False
-    for item in resp['FunctionList']['Items']:
-        if item['Name'] == function_name and item['FunctionMetadata']['Stage'] == "LIVE":
+    for item in resp["FunctionList"]["Items"]:
+        if (
+            item["Name"] == function_name
+            and item["FunctionMetadata"]["Stage"] == "LIVE"
+        ):
             logging.debug("found existing published function %s", function_name)
             return function_name
-        if item['Name'] == function_name:
+        if item["Name"] == function_name:
             # The function was found but not published.
             found_name = True
 
@@ -238,7 +287,7 @@ def create_function(function, dry_run=False):
         # function.
         logging.info("publishing function %s", function_name)
         if not dry_run:
-            etag = CLIENT.describe_function(Name=function_name)['ETag']
+            etag = CLIENT.describe_function(Name=function_name)["ETag"]
             CLIENT.publish_function(Name=function_name, IfMatch=etag)
         return function_name
 
@@ -246,36 +295,48 @@ def create_function(function, dry_run=False):
     logging.info("creating function %s", function_name)
     if not dry_run:
         config = {
-            'Comment': '503 maintenance page created by cdn_maintenance_toggle',
-            'Runtime': 'cloudfront-js-1.0',
+            "Comment": "503 maintenance page created by cdn_maintenance_toggle",
+            "Runtime": "cloudfront-js-1.0",
         }
-        response = CLIENT.create_function(Name=function_name, FunctionConfig=config, FunctionCode=function.encode('utf8'))
+        response = CLIENT.create_function(
+            Name=function_name,
+            FunctionConfig=config,
+            FunctionCode=function.encode("utf8"),
+        )
 
     logging.info("publishing function %s", function_name)
     if not dry_run:
-        CLIENT.publish_function(Name=function_name, IfMatch=response['ETag'])
+        CLIENT.publish_function(Name=function_name, IfMatch=response["ETag"])
 
     return function_name
+
 
 def remove_maintenance_function(distribution, dry_run=False):
     """Idempotently remove any maintenance functions from a CloudFront distribution."""
 
-    resp = CLIENT.get_distribution_config(Id=distribution['Id'])
-    cache_config = resp['DistributionConfig']['DefaultCacheBehavior']
+    resp = CLIENT.get_distribution_config(Id=distribution["Id"])
+    cache_config = resp["DistributionConfig"]["DefaultCacheBehavior"]
 
     needs_update = False
 
-    if 'Items' not in cache_config['FunctionAssociations']:
-        cache_config['FunctionAssociations']['Items'] = []
-    for i, item in enumerate(cache_config['FunctionAssociations']['Items']):
-        if item['EventType'] in ('viewer-request', 'viewer-response') and "maintenance-" in item['FunctionARN']:
+    if "Items" not in cache_config["FunctionAssociations"]:
+        cache_config["FunctionAssociations"]["Items"] = []
+    for i, item in enumerate(cache_config["FunctionAssociations"]["Items"]):
+        if (
+            item["EventType"] in ("viewer-request", "viewer-response")
+            and "maintenance-" in item["FunctionARN"]
+        ):
             needs_update = True
 
             # Delete the maintenance function.
-            logging.info("removing function %s from %s", item['FunctionARN'], ", ".join(distribution['Aliases']['Items']))
+            logging.info(
+                "removing function %s from %s",
+                item["FunctionARN"],
+                ", ".join(distribution["Aliases"]["Items"]),
+            )
 
-            cache_config['FunctionAssociations']['Quantity'] -= 1
-            del cache_config['FunctionAssociations']['Items'][i]
+            cache_config["FunctionAssociations"]["Quantity"] -= 1
+            del cache_config["FunctionAssociations"]["Items"][i]
 
     if not needs_update:
         # No maintenance functions detected.
@@ -285,14 +346,15 @@ def remove_maintenance_function(distribution, dry_run=False):
         return
 
     # Rename ETag to IfMatch to convert the response to a request.
-    resp['IfMatch'] = resp['ETag']
-    del resp['ETag']
+    resp["IfMatch"] = resp["ETag"]
+    del resp["ETag"]
 
     # Delete ResponseMetadata.
-    del resp['ResponseMetadata']
+    del resp["ResponseMetadata"]
 
     # Update the distribution to remove the function(s).
-    CLIENT.update_distribution(Id=distribution['Id'], **resp)
+    CLIENT.update_distribution(Id=distribution["Id"], **resp)
+
 
 def set_maintenance_function(distribution, function_name, dry_run=False):
     """Idempotently configure a request type function on a CloudFront distribution.
@@ -300,64 +362,121 @@ def set_maintenance_function(distribution, function_name, dry_run=False):
     The passed function_name must be a published CloudFront function or this function will raise an exception.
     """
 
-    dist_response = CLIENT.get_distribution_config(Id=distribution['Id'])
-    cache_config = dist_response['DistributionConfig']['DefaultCacheBehavior']
+    dist_response = CLIENT.get_distribution_config(Id=distribution["Id"])
+    cache_config = dist_response["DistributionConfig"]["DefaultCacheBehavior"]
 
-    if 'Items' in cache_config['LambdaFunctionAssociations']:
-        if len([i for i in cache_config['LambdaFunctionAssociations']['Items'] if i['EventType'] in ('viewer-request', 'viewer-response')]) != 0:
-            logging.error("cannot disable site with existing request or response Lambda functions: %s", ", ".join(distribution['Aliases']['Items']))
+    if "Items" in cache_config["LambdaFunctionAssociations"]:
+        if (
+            len(
+                [
+                    i
+                    for i in cache_config["LambdaFunctionAssociations"]["Items"]
+                    if i["EventType"] in ("viewer-request", "viewer-response")
+                ]
+            )
+            != 0
+        ):
+            logging.error(
+                "cannot disable site with existing request or response Lambda functions: %s",
+                ", ".join(distribution["Aliases"]["Items"]),
+            )
             return
 
-    event_type = ''
+    event_type = ""
 
-    if 'Items' not in cache_config['FunctionAssociations']:
-        cache_config['FunctionAssociations']['Items'] = []
-    for i, item in enumerate(cache_config['FunctionAssociations']['Items']):
-        if item['EventType'] in ('viewer-request', 'viewer-response')  and function_name in item['FunctionARN']:
+    if "Items" not in cache_config["FunctionAssociations"]:
+        cache_config["FunctionAssociations"]["Items"] = []
+    for i, item in enumerate(cache_config["FunctionAssociations"]["Items"]):
+        if (
+            item["EventType"] in ("viewer-request", "viewer-response")
+            and function_name in item["FunctionARN"]
+        ):
             # This maintenance function is already set on this distribution.
-            logging.debug("found %s function %s on %s", item['EventType'], function_name, ", ".join(distribution['Aliases']['Items']))
+            logging.debug(
+                "found %s function %s on %s",
+                item["EventType"],
+                function_name,
+                ", ".join(distribution["Aliases"]["Items"]),
+            )
             return
-        if item['EventType'] in ('viewer-request', 'viewer-response') and "maintenance-" in item['FunctionARN']:
+        if (
+            item["EventType"] in ("viewer-request", "viewer-response")
+            and "maintenance-" in item["FunctionARN"]
+        ):
             # Delete any previous maintenance functions with a different hash/name.
-            logging.info("removing %s function %s from %s", item['EventType'], item['FunctionARN'], ", ".join(distribution['Aliases']['Items']))
+            logging.info(
+                "removing %s function %s from %s",
+                item["EventType"],
+                item["FunctionARN"],
+                ", ".join(distribution["Aliases"]["Items"]),
+            )
 
-            cache_config['FunctionAssociations']['Quantity'] -= 1
-            del cache_config['FunctionAssociations']['Items'][i]
+            cache_config["FunctionAssociations"]["Quantity"] -= 1
+            del cache_config["FunctionAssociations"]["Items"][i]
 
-    if len([i for i in cache_config['FunctionAssociations']['Items'] if i['EventType'] == 'viewer-request']) == 0:
+    if (
+        len(
+            [
+                i
+                for i in cache_config["FunctionAssociations"]["Items"]
+                if i["EventType"] == "viewer-request"
+            ]
+        )
+        == 0
+    ):
         # No other viewer-request functions; add as a request function.
-        event_type = 'viewer-request'
-    elif len([i for i in cache_config['FunctionAssociations']['Items'] if i['EventType'] == 'viewer-response']) == 0:
+        event_type = "viewer-request"
+    elif (
+        len(
+            [
+                i
+                for i in cache_config["FunctionAssociations"]["Items"]
+                if i["EventType"] == "viewer-response"
+            ]
+        )
+        == 0
+    ):
         # No other viewer-response functions; add as a response function.
-        event_type = 'viewer-response'
+        event_type = "viewer-response"
     else:
         # Both viewer-request and viewer-response have non-maintenance-related functions.
-        logging.error("cannot disable site with existing request and response functions: %s", ", ".join(distribution['Aliases']['Items']))
+        logging.error(
+            "cannot disable site with existing request and response functions: %s",
+            ", ".join(distribution["Aliases"]["Items"]),
+        )
         return
 
-    logging.info("adding %s function %s to %s", event_type, function_name, ", ".join(distribution['Aliases']['Items']))
+    logging.info(
+        "adding %s function %s to %s",
+        event_type,
+        function_name,
+        ", ".join(distribution["Aliases"]["Items"]),
+    )
 
     if dry_run:
         return
 
     # Stage the additional function.
-    func_response = CLIENT.describe_function(Name=function_name, Stage='LIVE')
-    function_metadata = func_response['FunctionSummary']['FunctionMetadata']
-    cache_config['FunctionAssociations']['Items'].append({
-        'FunctionARN': function_metadata['FunctionARN'],
-        'EventType': event_type,
-    })
-    cache_config['FunctionAssociations']['Quantity'] += 1
+    func_response = CLIENT.describe_function(Name=function_name, Stage="LIVE")
+    function_metadata = func_response["FunctionSummary"]["FunctionMetadata"]
+    cache_config["FunctionAssociations"]["Items"].append(
+        {
+            "FunctionARN": function_metadata["FunctionARN"],
+            "EventType": event_type,
+        }
+    )
+    cache_config["FunctionAssociations"]["Quantity"] += 1
 
     # Rename ETag to IfMatch to convert the response to a request.
-    dist_response['IfMatch'] = dist_response['ETag']
-    del dist_response['ETag']
+    dist_response["IfMatch"] = dist_response["ETag"]
+    del dist_response["ETag"]
 
     # Delete ResponseMetadata.
-    del dist_response['ResponseMetadata']
+    del dist_response["ResponseMetadata"]
 
     # Update the distribution to add our function.
-    CLIENT.update_distribution(Id=distribution['Id'], **dist_response)
+    CLIENT.update_distribution(Id=distribution["Id"], **dist_response)
+
 
 def get_matching_distributions(patterns):
     """Find Cloudfront distributions matching the supplied domain patterns."""
@@ -369,25 +488,29 @@ def get_matching_distributions(patterns):
         # Fetch next batch of CloudFront distributions in the current AWS
         # account (global region).
         resp = CLIENT.list_distributions(**args)
-        if 'Items' not in resp['DistributionList']:
+        if "Items" not in resp["DistributionList"]:
             break
-        for distribution in resp['DistributionList']['Items']:
-            if 'Items' not in distribution['Aliases']:
-                logging.warning("ignoring distribution %s with no domain aliases", distribution['Id'])
+        for distribution in resp["DistributionList"]["Items"]:
+            if "Items" not in distribution["Aliases"]:
+                logging.warning(
+                    "ignoring distribution %s with no domain aliases",
+                    distribution["Id"],
+                )
                 continue
-            for domain in distribution['Aliases']['Items']:
+            for domain in distribution["Aliases"]["Items"]:
                 if fnmatch_any(domain.lower(), patterns):
                     distributions.append(distribution)
                     # No need to check other domains in this distribution.
                     break
 
-        if 'Marker' not in resp:
+        if "Marker" not in resp:
             # Final page of results.
             break
 
-        args['NextMarker'] = resp['Marker']
+        args["NextMarker"] = resp["Marker"]
 
     return distributions
+
 
 def fnmatch_any(string, patterns):
     """Run fnmatch on multiple patterns and return True if any match, otherwise False."""
@@ -397,5 +520,6 @@ def fnmatch_any(string, patterns):
             return True
     return False
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
