@@ -1,0 +1,5 @@
+# Copyright The Linux Foundation and each contributor to LFX.
+# SPDX-License-Identifier: MIT
+[flake8]
+max-line-length = 180
+extend-ignore = E203

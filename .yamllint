@@ -1,0 +1,13 @@
+# Copyright The Linux Foundation and each contributor to LFX.
+# SPDX-License-Identifier: MIT
+---
+extends: default
+ignore: |
+  .git
+  megalinter-reports
+  __pycache__
+  .ruff_cache
+rules:
+  line-length:
+    max: 120
+    level: warning

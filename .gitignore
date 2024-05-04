@@ -1,6 +1,10 @@
 # Copyright The Linux Foundation and each contributor to LFX.
 # SPDX-License-Identifier: MIT
 
+megalinter-reports
+.ruff_cache/
+__pycache__/
+
 # Normally, committing lockfiles is a best practice. But 1) this is a local
 # shell utility, run sporadically and 2) committing a lockfile means keeping it
 # up to date every time there is a security issue. In this case, we're going to
