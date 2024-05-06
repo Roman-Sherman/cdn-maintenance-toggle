@@ -1,0 +1,22 @@
+# Copyright The Linux Foundation and each contributor to LFX.
+# SPDX-License-Identifier: MIT
+---
+DISABLE_LINTERS:
+  # A self-contained maintaince page is not expected to conform to best
+  # practices for web site.
+  - HTML_DJLINT
+  # Pylint doesn't handle our Pipenv dependencies, and is redundant with ruff.
+  - PYTHON_PYLINT
+  # Pyright doesn't handle our pipenv dependencies, plus we aren't using
+  # static typing.
+  - PYTHON_PYRIGHT
+  # Disable dependency security scanning.
+  - REPOSITORY_GRYPE
+  - REPOSITORY_TRIVY
+  - REPOSITORY_TRIVY_SBOM
+  # cspell is laughably bad at code/comments/etc.
+  - SPELL_CSPELL
+  # Link checking more likely to cause false positives than be useful for us.
+  - SPELL_LYCHEE
+GITHUB_COMMENT_REPORTER: false
+GITHUB_STATUS_REPORTER: true

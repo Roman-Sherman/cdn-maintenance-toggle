@@ -1,0 +1,11 @@
+# Copyright The Linux Foundation and each contributor to LFX.
+# SPDX-License-Identifier: MIT
+-i https://pypi.org/simple
+boto3
+botocore
+jmespath
+python-dateutil
+s3transfer
+six
+trieregex
+urllib3
