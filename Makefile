@@ -9,8 +9,7 @@ clean:
 	rm -Rf __pycache__ .ruff_cache megalinter-reports
 
 lint:
-	#docker run --rm --platform linux/amd64 -v '$(CURDIR):/tmp/lint:rw' oxsecurity/megalinter-python:v7
-	docker run --rm --platform linux/amd64 -v '$(CURDIR):/tmp/lint:rw' oxsecurity/megalinter:v7
+	docker run --rm --platform linux/amd64 -v '$(CURDIR):/tmp/lint:rw' oxsecurity/megalinter-python:v7
 
 test:
 	@echo "No tests to run ... would you like to 'make lint'?"
