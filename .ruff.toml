@@ -1,9 +1,0 @@
-# Copyright The Linux Foundation and each contributor to LFX.
-# SPDX-License-Identifier: MIT
-
-line-length = 180
-target-version = "py310"
-
-[lint]
-select = ["E", "F", "W"]
-

@@ -3,22 +3,30 @@
 
 .PHONY: all clean test
 
+all:
+	@echo 'no default: supported targets are "requirements.txt", ".venv", "clean" and "sync"' >&2
 all: requirements.txt
 
 clean:
-	rm -Rf __pycache__ .ruff_cache megalinter-reports
+	rm -Rf requirements.txt __pycache__ .venv .ruff_cache megalinter-reports
 
 lint:
+	docker pull oxsecurity/megalinter-python:v7
 	docker run --rm --platform linux/amd64 -v '$(CURDIR):/tmp/lint:rw' oxsecurity/megalinter-python:v7
 
 test:
-	@echo "No tests to run ... would you like to 'make lint'?"
+	@echo "No tests to run ... would you like to 'make lint'?" >&2
 
-requirements.txt: Pipfile.lock .license-header
+requirements.txt: requirements.in
 	cat .license-header > requirements.txt
-	# Because we are avoiding pinning dep versions, we also prune them from the
-	# generated requirements.txt file.
-	pipenv requirements --exclude-markers | sed 's/=.*$$//' >> requirements.txt
+	uv pip compile requirements.in >> requirements.txt
 
-Pipfile.lock: Pipfile
-	pipenv lock
+.venv:
+	uv venv .venv
+
+sync: .venv requirements.txt
+	uv pip sync requirements.txt
+
+fmt:
+	uv tool -q run black *.py
+	uv tool -q run isort *.py

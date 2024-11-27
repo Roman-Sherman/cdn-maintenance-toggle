@@ -5,10 +5,9 @@ DISABLE_LINTERS:
   # A self-contained maintaince page is not expected to conform to best
   # practices for web site.
   - HTML_DJLINT
-  # Pylint doesn't handle our Pipenv dependencies, and is redundant with ruff.
+  # Pylint errors on missing dependencies, and is redundant with ruff.
   - PYTHON_PYLINT
-  # Pyright doesn't handle our pipenv dependencies, plus we aren't using
-  # static typing.
+  # Pyright errors on missing dependencies.
   - PYTHON_PYRIGHT
   # Disable dependency security scanning.
   - REPOSITORY_GRYPE

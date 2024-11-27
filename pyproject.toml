@@ -1,0 +1,18 @@
+# Copyright The Linux Foundation and each contributor to LFX.
+# SPDX-License-Identifier: MIT
+
+[project]
+name = "cdn-maintenance-toggle"
+version = "0.0.1"
+requires-python = ">=3.12"
+
+[tool.isort]
+profile = "black"
+
+[tool.ruff]
+target-version = "py312"
+# For linting only; not intended for `ruff format`.
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "UP", "B", "G", "I", "ANN"]
