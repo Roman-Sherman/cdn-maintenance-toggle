@@ -5,7 +5,6 @@
 
 all:
 	@echo 'no default: supported targets are "requirements.txt", ".venv", "clean" and "sync"' >&2
-all: requirements.txt
 
 clean:
 	rm -Rf requirements.txt __pycache__ .venv .ruff_cache megalinter-reports
