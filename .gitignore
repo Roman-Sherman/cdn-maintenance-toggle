@@ -9,4 +9,5 @@ __pycache__/
 # shell utility, run sporadically and 2) committing a lockfile means keeping it
 # up to date every time there is a security issue. In this case, we're going to
 # assume "follow latest" for each use/installation.
-Pipfile.lock
+uv.lock
+requirements.txt

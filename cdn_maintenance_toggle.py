@@ -3,7 +3,8 @@
 # Copyright The Linux Foundation and each contributor to LFX.
 # SPDX-License-Identifier: MIT
 
-"""
+"""Set or clear maintenance notices on CloudFlare CDNs.
+
 This script disables/enables CDN services operating on AWS Cloudfront by
 setting them into maintenance mode, implemented as a Cloudfront edge function
 returning an HTML maintenance page.
@@ -19,7 +20,7 @@ from hashlib import sha256
 
 import boto3
 from botocore.exceptions import ClientError
-from trieregex import TrieRegEx as TRE
+from trieregex import TrieRegEx
 
 # Optional support for .env file.
 try:
@@ -74,13 +75,15 @@ FUNCTION_TEMPLATE = """function handler(event) {
   return response;
 }"""
 
+# Maximum size of Cloudfront function after interpolating the template.
+MAX_FUNCTION_SIZE = 20000
 
-def main():
-    """main is the entry point for script invocations."""
 
+def main() -> None:
+    """Implement command-line interface."""
     # Parse arguments from command line.
     parser = argparse.ArgumentParser(
-        description="Set or clear maintenance notices on CloudFlare CDNs for the current AWS_PROFILE."
+        description="Set or clear maintenance notices on CloudFlare CDNs."
     )
     parser.add_argument(
         "--dry-run",
@@ -159,24 +162,28 @@ def main():
         )
 
 
-def enable_sites(patterns, dry_run=False):
+def enable_sites(patterns: list, dry_run: bool = False) -> None:
     """Enable sites matching patterns (clear maintenance page)."""
-
     targets = get_matching_distributions(patterns)
-
     if dry_run is True:
         logging.warning("running in dry-run mode: any logged changes are as-if")
-
     for distribution in targets:
         remove_maintenance_function(distribution, dry_run=dry_run)
 
 
-def disable_sites(patterns, html=None, allowed_ips=tuple(), dry_run=False):
+def disable_sites(
+    patterns: list,
+    html: str | None = None,
+    allowed_ips: list | None = None,
+    dry_run: bool = False,
+) -> None:
     """Disable sites matching patterns (set maintenance page)."""
-
     if html is None:
         # Fallback/default maintenance page HTML.
-        html = "<!DOCTYPE html><html><body><p>This site is down for scheduled maintenance.</p></body></html>"
+        html = (
+            "<!DOCTYPE html>"
+            "<html><body><p>This site is down for scheduled maintenance.</p></body></html>"
+        )
 
     # Find Cloudfront distributions matching the supplied domain patterns.
     targets = get_matching_distributions(patterns)
@@ -188,10 +195,13 @@ def disable_sites(patterns, html=None, allowed_ips=tuple(), dry_run=False):
         # Bypass function creation if there are no matching targets.
         return
 
+    if allowed_ips is None:
+        allowed_ips = []
+
     html_bytes = html.encode("utf8")
 
     # Validate passed IPs and build a trie regex pattern out of them.
-    tre = TRE("127.0.0.1")
+    tre = TrieRegEx("127.0.0.1")
     for ip_text in allowed_ips:
         try:
             # Read IPv4 & IPv6 addresses.
@@ -225,9 +235,8 @@ def disable_sites(patterns, html=None, allowed_ips=tuple(), dry_run=False):
         set_maintenance_function(distribution, function_name, dry_run=dry_run)
 
 
-def cleanup(dry_run=False):
+def cleanup(dry_run: bool = False) -> None:
     """Delete unused maintenance pages."""
-
     if dry_run is True:
         logging.warning("running in dry-run mode: any logged changes are as-if")
 
@@ -258,10 +267,16 @@ def cleanup(dry_run=False):
                 raise error
 
 
-def create_function(function, dry_run=False):
-    """Idempotently create-if-not-exist the provided CloudFront function and return the function name."""
+def create_function(function: str, dry_run: bool = False) -> str:
+    """Create a CloudFront function if it does not exist.
 
-    if len(function) > 20000:
+    The function will be named based on a hash of the function's code. Returns
+    the function name.
+    """
+    if len(function) > MAX_FUNCTION_SIZE:
+        # Check size explicitly, rather than merely catching the corresponding
+        # error, to allow users to catch and work around limits even in dry-run
+        # mode.
         raise ValueError("function is too big, try reducing allowed IPs")
 
     # Hash the function to calculate a unique function name.
@@ -311,9 +326,8 @@ def create_function(function, dry_run=False):
     return function_name
 
 
-def remove_maintenance_function(distribution, dry_run=False):
+def remove_maintenance_function(distribution: dict, dry_run: bool = False) -> None:
     """Idempotently remove any maintenance functions from a CloudFront distribution."""
-
     resp = CLIENT.get_distribution_config(Id=distribution["Id"])
     cache_config = resp["DistributionConfig"]["DefaultCacheBehavior"]
 
@@ -356,12 +370,14 @@ def remove_maintenance_function(distribution, dry_run=False):
     CLIENT.update_distribution(Id=distribution["Id"], **resp)
 
 
-def set_maintenance_function(distribution, function_name, dry_run=False):
+def set_maintenance_function(
+    distribution: dict, function_name: str, dry_run: bool = False
+) -> None:
     """Idempotently configure a request type function on a CloudFront distribution.
 
-    The passed function_name must be a published CloudFront function or this function will raise an exception.
+    The passed function_name must be a published CloudFront function or this
+    function will raise an exception.
     """
-
     dist_response = CLIENT.get_distribution_config(Id=distribution["Id"])
     cache_config = dist_response["DistributionConfig"]["DefaultCacheBehavior"]
 
@@ -478,12 +494,10 @@ def set_maintenance_function(distribution, function_name, dry_run=False):
     CLIENT.update_distribution(Id=distribution["Id"], **dist_response)
 
 
-def get_matching_distributions(patterns):
+def get_matching_distributions(patterns: list) -> list:
     """Find Cloudfront distributions matching the supplied domain patterns."""
-
     distributions = []
-
-    args = {}
+    args: dict[str, str] = {}
     while True:
         # Fetch next batch of CloudFront distributions in the current AWS
         # account (global region).
@@ -512,13 +526,9 @@ def get_matching_distributions(patterns):
     return distributions
 
 
-def fnmatch_any(string, patterns):
+def fnmatch_any(string: str, patterns: list) -> bool:
     """Run fnmatch on multiple patterns and return True if any match, otherwise False."""
-
-    for pattern in patterns:
-        if fnmatch(string, pattern):
-            return True
-    return False
+    return any(fnmatch(string, pattern) for pattern in patterns)
 
 
 if __name__ == "__main__":
