@@ -307,7 +307,7 @@ def create_function(function: str, dry_run: bool = False) -> str:
         return function_name
 
     # The function was not found, so it needs to be created and published.
-    logging.info("creating function %s", function_name)
+    logging.info("creating & publishing function %s", function_name)
     if not dry_run:
         config = {
             "Comment": "503 maintenance page created by cdn_maintenance_toggle",
@@ -319,8 +319,6 @@ def create_function(function: str, dry_run: bool = False) -> str:
             FunctionCode=function.encode("utf8"),
         )
 
-    logging.info("publishing function %s", function_name)
-    if not dry_run:
         CLIENT.publish_function(Name=function_name, IfMatch=response["ETag"])
 
     return function_name
