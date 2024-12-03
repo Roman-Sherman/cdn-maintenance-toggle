@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.11
+#!/usr/bin/env python3.12
 #
 # Copyright The Linux Foundation and each contributor to LFX.
 # SPDX-License-Identifier: MIT
