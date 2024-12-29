@@ -11,3 +11,6 @@ __pycache__/
 # assume "follow latest" for each use/installation.
 uv.lock
 requirements.txt
+
+# Ignore user's local Python virtual env
+.venv/
